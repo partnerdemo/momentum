@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader, AlertTriangle, Plus, ShoppingCart } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
+import { useSocket } from '../../../lib/hooks/useSocket';
 import CreateStoreItemModal from './CreateStoreItemModal';
 import EditStoreItemModal from './EditStoreItemModal';
 import DeleteStoreItemModal from './DeleteStoreItemModal';
@@ -30,6 +31,7 @@ const StoreItemList: React.FC = () => {
     const [selectedItem, setSelectedItem] = useState<IStoreItem | null>(null);
 
     const { token, user } = useSession();
+    const socket = useSocket();
 
     const fetchData = useCallback(async () => {
         if (!token) {
@@ -68,6 +70,36 @@ const StoreItemList: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // WebSocket Listener
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleStoreUpdate = (data: { type: string; storeItem?: IStoreItem; storeItemId?: string }) => {
+            console.log('[StoreItemList] WebSocket update received:', data);
+
+            if (data.type === 'create' && data.storeItem) {
+                setItems(current => {
+                    // Avoid duplicates
+                    if (current.some(i => i._id === data.storeItem!._id)) return current;
+                    return [...current, data.storeItem!];
+                });
+            } else if (data.type === 'update' && data.storeItem) {
+                setItems(current =>
+                    current.map(item => item._id === data.storeItem!._id ? data.storeItem! : item)
+                );
+            } else if (data.type === 'delete' && data.storeItemId) {
+                setItems(current =>
+                    current.filter(item => item._id !== data.storeItemId)
+                );
+            }
+        };
+
+        socket.on('store_item_updated', handleStoreUpdate);
+        return () => {
+            socket.off('store_item_updated', handleStoreUpdate);
+        };
+    }, [socket]);
 
     const handleItemCreated = (newItem: IStoreItem) => {
         setItems(current => [...current, newItem]);

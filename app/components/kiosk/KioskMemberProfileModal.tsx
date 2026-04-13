@@ -34,6 +34,7 @@ const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
     const { token } = useSession();
     const [activeTab, setActiveTab] = useState<TabType>('tasks');
     const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+    const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isFocusModeActive, setIsFocusModeActive] = useState(false);
 
@@ -111,8 +112,36 @@ const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
 
     // Handle reward request
     const handleRequestReward = async (itemId: string) => {
-        // TODO: Implement approval request system
-        showAlert('Coming Soon', 'Reward approval system coming soon!');
+        if (purchasingItemId) return;
+        setPurchasingItemId(itemId);
+
+        try {
+            const response = await fetch(`/web-bff/store/${itemId}/purchase`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ memberId: member.familyMemberId._id }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to purchase item');
+            }
+
+            // Success feedback
+            showAlert('Reward Redeemed!', `You purchased the item successfully!`, 'success');
+
+            // Refresh data (points deduction)
+            await onRefresh();
+
+        } catch (e: any) {
+            showAlert('Purchase Failed', e.message, 'error');
+        } finally {
+            setPurchasingItemId(null);
+        }
     };
 
     // ... TabButton ...
@@ -352,11 +381,21 @@ const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
                                                         </span>
                                                         <button
                                                             onClick={() => handleRequestReward(item._id)}
+                                                            disabled={purchasingItemId === item._id}
                                                             className="px-4 py-2 bg-signal-success text-white rounded-lg font-medium 
-                                                                 hover:bg-signal-success/90 transition-all flex items-center space-x-1"
+                                                                 hover:bg-signal-success/90 transition-all flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
-                                                            <span>Redeem</span>
-                                                            <ChevronRight className="w-4 h-4" />
+                                                            {purchasingItemId === item._id ? (
+                                                                <>
+                                                                    <Loader className="w-4 h-4 animate-spin" />
+                                                                    <span>...</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <span>Redeem</span>
+                                                                    <ChevronRight className="w-4 h-4" />
+                                                                </>
+                                                            )}
                                                         </button>
                                                     </div>
                                                 </div>

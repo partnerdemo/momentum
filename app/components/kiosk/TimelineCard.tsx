@@ -35,7 +35,7 @@ const TimelineCard: React.FC = () => {
             if (!response.ok) throw new Error('Failed to load events');
 
             const data = await response.json();
-            const eventList = Array.isArray(data) ? data : (data.data || []);
+            const eventList = data.data.events;
 
             // Local mapping
             const mappedEvents: ICalendarEvent[] = eventList.map((evt: any) => {

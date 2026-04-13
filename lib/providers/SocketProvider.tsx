@@ -26,7 +26,7 @@ import { useSession } from '../../app/components/layout/SessionContext';
 // ... (keep surrounding code)
 
 export function SocketProvider({ children }: SocketProviderProps) {
-    const { token } = useSession();
+    const { token, householdId } = useSession();
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
 
@@ -44,6 +44,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
         const handleConnect = () => {
             console.log('[SocketProvider] Connected');
             setIsConnected(true);
+            if (householdId) {
+                console.log('[SocketProvider] Joining household:', householdId);
+                socketInstance.emit('join_household', householdId);
+            }
         };
 
         const handleDisconnect = (reason: string) => {
@@ -73,7 +77,15 @@ export function SocketProvider({ children }: SocketProviderProps) {
             // Disconnect socket when provider unmounts or token changes
             disconnectSocket();
         };
-    }, [token]);
+    }, [token, householdId]);
+
+    // Enhanced logic to join room if householdId loads LATER than the socket connection
+    useEffect(() => {
+        if (socket && isConnected && householdId) {
+            console.log('[SocketProvider] Ensuring household join:', householdId);
+            socket.emit('join_household', householdId);
+        }
+    }, [socket, isConnected, householdId]);
 
     return (
         <SocketContext.Provider value={{ socket, isConnected }}>

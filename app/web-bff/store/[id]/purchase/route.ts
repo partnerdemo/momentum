@@ -1,48 +1,48 @@
-// =========================================================
-// silkpanda/momentum/app/web-bff/store/[id]/purchase/route.ts
-// EMBEDDED WEB BFF (v4 Blueprint)
-// Handles purchasing a store item (POST)
-// =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { API_BASE_URL } from '@/lib/config';
 
-/**
- * @desc    Purchase a store item
- * @route   POST /web-bff/store/:id/purchase
- * @access  Private
- */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(
+    request: Request,
+    { params }: { params: { id: string } }
+) {
     const headersList = headers();
     const authorization = headersList.get('authorization');
-    const { id: itemId } = params;
 
     if (!authorization) {
         return NextResponse.json({ message: 'Authorization header is missing' }, { status: 401 });
     }
 
-    const API_URL = `${API_BASE_URL}/store-items/${itemId}/purchase`;
-
     try {
-        // 1. Get the body (which contains the memberId)
-        const body = await req.json();
+        const body = await request.json();
+        const { memberId } = body;
 
-        // 2. Forward the POST request to the internal 'momentum-api'
-        const apiResponse = await fetch(API_URL, {
+        if (!memberId) {
+            return NextResponse.json({ message: 'Member ID is required' }, { status: 400 });
+        }
+
+        const response = await fetch(`${API_BASE_URL}/store-items/${params.id}/purchase`, {
             method: 'POST',
             headers: {
                 'Authorization': authorization,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify({ memberId }),
         });
 
-        const data = await apiResponse.json();
+        const data = await response.json();
 
-        // 3. Return the API's response to our client
-        return NextResponse.json(data, { status: apiResponse.status });
+        if (!response.ok) {
+            return NextResponse.json(data, { status: response.status });
+        }
 
-    } catch (err: any) {
-        return NextResponse.json({ message: 'BFF Error: Failed to purchase item', error: err.message }, { status: 500 });
+        return NextResponse.json(data);
+
+    } catch (error: any) {
+        console.error('[BFF] Purchase store item error:', error);
+        return NextResponse.json(
+            { message: 'Internal Server Error', error: error.message },
+            { status: 500 }
+        );
     }
 }

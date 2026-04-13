@@ -62,6 +62,16 @@ const KioskDashboard: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFocusModalOpen, setIsFocusModalOpen] = useState(false);
 
+    // FIX: Keep selectedMember in sync with global members data (for real-time point updates)
+    React.useEffect(() => {
+        if (selectedMember) {
+            const updatedMember = members.find(m => m._id === selectedMember._id);
+            if (updatedMember && updatedMember !== selectedMember) {
+                setSelectedMember(updatedMember);
+            }
+        }
+    }, [members, selectedMember]);
+
     // Alert Modal State
     const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean, title: string, message: string, variant: 'info' | 'error' | 'success' }>({
         isOpen: false,
