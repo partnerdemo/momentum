@@ -167,11 +167,18 @@ const TimelineCard: React.FC = () => {
                         const happening = isHappeningNow(start, end);
                         const past = isPast(end);
 
+                        let eventColor = event.color || '#8b5cf6';
+                        // Fallback to attendee's profile color if event doesn't explicitly have one
+                        if (!event.color && event.attendees && event.attendees.length === 1) {
+                            const actMember = getMemberAvatar(event.attendees[0].email);
+                            if (actMember?.profileColor) eventColor = actMember.profileColor;
+                        }
+
                         return (
                             <div
                                 key={event.id}
                                 className={`
-                                    relative p-4 rounded-2xl border transition-all duration-300
+                                    relative flex rounded-2xl border transition-all duration-300 overflow-hidden min-h-[80px]
                                     ${happening
                                         ? 'bg-white border-action-primary shadow-lg scale-[1.02] ring-2 ring-action-primary/20 z-10'
                                         : past
@@ -181,51 +188,54 @@ const TimelineCard: React.FC = () => {
                                 `}
                             >
                                 {happening && (
-                                    <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 bg-action-primary text-white text-xs font-bold rounded-full animate-pulse">
-                                        <span className="w-2 h-2 bg-white rounded-full" />
+                                    <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-1 bg-action-primary text-white text-xs font-bold rounded-full animate-pulse z-20 shadow-sm">
+                                        <span className="w-1.5 h-1.5 bg-white rounded-full" />
                                         NOW
                                     </div>
                                 )}
 
-                                <div className="flex gap-4">
-                                    {/* Time Column */}
-                                    <div className="flex flex-col items-center min-w-[60px]">
-                                        <span className={`text-sm font-bold ${happening ? 'text-action-primary' : 'text-text-primary'}`}>
-                                            {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                {/* Left Panel: Solid Color Block with Time */}
+                                <div 
+                                    className="flex flex-col items-center justify-center min-w-[75px] px-2 text-white shrink-0"
+                                    style={{ backgroundColor: eventColor }}
+                                >
+                                    <span className="text-sm font-bold tracking-tight">
+                                        {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(' ', '\n')}
+                                    </span>
+                                    {!event.allDay && (
+                                        <div className="h-4 w-0.5 bg-white/40 my-1 rounded-full" />
+                                    )}
+                                    {!event.allDay && (
+                                        <span className="text-xs font-medium text-white/80 tracking-tight">
+                                            {end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(' ', '\n')}
                                         </span>
-                                        {!event.allDay && (
-                                            <div className="h-full w-0.5 bg-border-subtle my-1 rounded-full" />
-                                        )}
-                                        {!event.allDay && (
-                                            <span className="text-xs text-text-secondary">
-                                                {end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                                            </span>
-                                        )}
-                                    </div>
+                                    )}
+                                </div>
 
-                                    {/* Content Column */}
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className={`font-bold text-lg leading-tight mb-1 truncate ${happening ? 'text-action-primary' : 'text-text-primary'}`}>
-                                            {event.title}
-                                        </h3>
+                                {/* Right Panel: Content */}
+                                <div className="flex-1 min-w-0 p-4 pl-5 flex flex-col justify-center">
+                                    <h3 className={`font-bold text-lg leading-tight mb-1 truncate ${happening ? 'text-action-primary' : 'text-text-primary'}`}>
+                                        {event.title}
+                                    </h3>
 
-                                        {event.location && (
-                                            <div className="flex items-center text-xs text-text-secondary mb-3">
-                                                <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
-                                                <span className="truncate">{event.location}</span>
-                                            </div>
-                                        )}
+                                    {event.location && (
+                                        <div className="flex items-center text-xs font-medium text-text-secondary mt-1">
+                                            <MapPin className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />
+                                            <span className="truncate">{event.location}</span>
+                                        </div>
+                                    )}
 
-                                        {/* Attendees / Description */}
-                                        <div className="flex items-center justify-between mt-2">
-                                            <div className="flex -space-x-2 overflow-hidden">
-                                                {event.attendees && event.attendees.map((att, i) => {
+                                    {/* Attendees / Description */}
+                                    {event.attendees && event.attendees.length > 0 && (
+                                        <div className="flex items-center justify-between mt-3">
+                                            <div className="flex -space-x-2 overflow-hidden items-center group-hover:space-x-1 transition-all">
+                                                {event.attendees.map((att, i) => {
                                                     const member = getMemberAvatar(att.email);
                                                     if (i > 4) return null; // Limit dots
                                                     return (
                                                         <div
                                                             key={i}
-                                                            className="w-8 h-8 rounded-full border-2 border-white bg-bg-canvas flex items-center justify-center text-xs font-bold text-text-secondary shadow-sm"
+                                                            className="w-7 h-7 rounded-full border-[1.5px] border-white bg-bg-canvas flex items-center justify-center text-[10px] font-bold text-text-secondary shadow-sm"
                                                             title={att.displayName || att.email}
                                                             style={{ backgroundColor: member?.profileColor || '#E5E7EB', color: member?.profileColor ? '#FFF' : undefined }}
                                                         >
@@ -238,7 +248,7 @@ const TimelineCard: React.FC = () => {
                                                 })}
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         );

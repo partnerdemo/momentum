@@ -8,9 +8,11 @@
 import React, { useState } from 'react';
 import { useSession } from '../layout/SessionContext';
 import { IHouseholdMemberProfile, ITask, IStoreItem } from '../../types';
-import { X, CheckSquare, Award, User, Loader, Gift, ChevronRight, Target, Play, Clock } from 'lucide-react';
+import { X, CheckSquare, Award, User, Loader, Gift, ChevronRight, Target, Play, Clock, Settings } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import FocusModeView from '../focus/FocusModeView';
 import AlertModal from '../shared/AlertModal';
+import PinVerificationModal from '../auth/PinVerificationModal';
 
 interface KioskMemberProfileModalProps {
     member: IHouseholdMemberProfile;
@@ -31,7 +33,9 @@ const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
     onRefresh,
     onUpdateTask,
 }) => {
-    const { token } = useSession();
+    const { token, householdId } = useSession();
+    const router = useRouter();
+    const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('tasks');
     const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
     const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
@@ -108,6 +112,10 @@ const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
         } finally {
             setCompletingTaskId(null);
         }
+    };
+
+    const handlePinSuccess = () => {
+        router.push('/admin');
     };
 
     // Handle reward request
@@ -213,13 +221,25 @@ const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
                             </div>
                         </div>
 
-                        {/* Close Button */}
-                        <button
-                            onClick={onClose}
-                            className="p-2 rounded-lg text-text-secondary hover:text-signal-alert hover:bg-signal-alert/10 transition-all"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
+                        {/* Actions */}
+                        <div className="flex items-center space-x-3">
+                            {member.role === 'Parent' && (
+                                <button
+                                    onClick={() => setIsPinModalOpen(true)}
+                                    className="px-4 py-2 bg-text-primary text-bg-surface rounded-lg font-bold flex items-center space-x-2 shadow-md hover:opacity-90 hover:scale-105 transition-all"
+                                >
+                                    <Settings className="w-5 h-5" />
+                                    <span>Parent Controls</span>
+                                </button>
+                            )}
+                            {/* Close Button */}
+                            <button
+                                onClick={onClose}
+                                className="p-2 rounded-lg text-text-secondary hover:text-signal-alert hover:bg-signal-alert/10 transition-all"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Tab Navigation */}
@@ -489,6 +509,16 @@ const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
                     </div>
                 </div>
             </div>
+
+            <PinVerificationModal
+                isOpen={isPinModalOpen}
+                onClose={() => setIsPinModalOpen(false)}
+                onSuccess={handlePinSuccess}
+                title="Parent Access"
+                description="Enter your PIN to manage the household."
+                memberId={member._id}
+                householdId={householdId || ''}
+            />
         </>
     );
 };

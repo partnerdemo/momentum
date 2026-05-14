@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { IMealPlan, IQuest, IRecipe } from '../../types';
-import { UtensilsCrossed, Trophy, Flame } from 'lucide-react';
+import { UtensilsCrossed, Trophy, Flame, ShoppingBag, ChevronRight } from 'lucide-react';
 
 interface EnvironmentColumnProps {
     mealPlans: IMealPlan[];
@@ -96,21 +96,21 @@ const EnvironmentColumn: React.FC<EnvironmentColumnProps> = ({ mealPlans, recipe
                 </div>
             </div>
 
-            {/* Widget C: Quest */}
-            <div className="bg-bg-surface border border-border-subtle rounded-3xl p-6 shadow-lg flex flex-col justify-between relative overflow-hidden">
-                <div className="flex justify-between items-start mb-4">
+            {/* Widget C: Quests & Rewards */}
+            <div className="bg-bg-surface border border-border-subtle rounded-3xl p-6 shadow-lg flex flex-col gap-4 relative overflow-hidden">
+                <div className="flex justify-between items-start">
                     <div>
                         <p className="text-text-secondary text-xs font-bold uppercase tracking-wider mb-1">Active Quest</p>
                         <h3 className="text-lg font-bold text-text-primary">
                             {activeQuest ? activeQuest.title : "No Active Quests"}
                         </h3>
                     </div>
-                    <div className="p-2 bg-yellow-100 rounded-xl text-yellow-600">
-                        <Trophy className="w-6 h-6" />
+                    <div className="p-2 bg-yellow-50 text-yellow-500 rounded-xl shadow-sm border border-yellow-100">
+                        <Trophy className="w-5 h-5" />
                     </div>
                 </div>
 
-                {activeQuest && (
+                {activeQuest ? (
                     <div className="w-full">
                         <div className="flex justify-between text-xs font-bold text-text-secondary mb-1">
                             <span>Progress</span>
@@ -123,13 +123,25 @@ const EnvironmentColumn: React.FC<EnvironmentColumnProps> = ({ mealPlans, recipe
                             />
                         </div>
                     </div>
-                )}
-
-                {!activeQuest && (
-                    <div className="text-sm text-text-secondary italic">
-                        Check the Quest Board to start an adventure!
+                ) : (
+                    <div className="text-sm border border-dashed border-border-subtle bg-bg-canvas/50 rounded-xl p-4 text-text-secondary text-center">
+                        <span className="opacity-70">Check the Quest Board to start an adventure!</span>
                     </div>
                 )}
+
+                {/* Family Store Shortcut */}
+                <button className="w-full flex justify-between items-center bg-blue-50/50 hover:bg-blue-50 border border-blue-100 rounded-2xl p-4 transition-colors group text-left mt-2">
+                    <div className="flex items-center gap-4">
+                        <div className="p-2.5 bg-blue-100 text-action-primary rounded-xl group-hover:scale-105 transition-transform">
+                            <ShoppingBag className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-blue-900 group-hover:text-action-primary transition-colors">Family Store</h4>
+                            <p className="text-xs font-medium text-blue-600/80">Redeem points for rewards</p>
+                        </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-blue-300 group-hover:text-action-primary transition-colors" />
+                </button>
             </div>
         </div>
     );

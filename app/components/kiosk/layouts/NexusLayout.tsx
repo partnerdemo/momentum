@@ -25,12 +25,7 @@ const NexusLayout: React.FC<NexusLayoutProps> = ({
 }) => {
     return (
         <div className="grid grid-cols-12 gap-6 h-full">
-            {/* Zone 1: Timeline (40% => ~5 cols) */}
-            <div className="col-span-12 lg:col-span-5 h-full min-h-[400px]">
-                <TimelineCard />
-            </div>
-
-            {/* Zone 2: Squad Status (35% => ~4 cols) */}
+            {/* Column 1: Responsibilities / Squad Status */}
             <div className="col-span-12 lg:col-span-4 h-full min-h-[400px]">
                 <RosterGrid
                     members={members}
@@ -40,13 +35,18 @@ const NexusLayout: React.FC<NexusLayoutProps> = ({
                 />
             </div>
 
-            {/* Zone 3: Environment (25% => ~3 cols) */}
-            <div className="col-span-12 lg:col-span-3 h-full min-h-[400px]">
+            {/* Column 2: Quests & Rewards (Environment) */}
+            <div className="col-span-12 lg:col-span-4 h-full min-h-[400px]">
                 <EnvironmentColumn
                     mealPlans={mealPlans}
                     recipes={recipes}
                     quests={quests}
                 />
+            </div>
+
+            {/* Column 3: The Schedule (Timeline) */}
+            <div className="col-span-12 lg:col-span-4 h-full min-h-[400px]">
+                <TimelineCard />
             </div>
         </div>
     );

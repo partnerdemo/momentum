@@ -30,3 +30,10 @@ body {
   /* Spacing & Radius */
   --radius-xl: 24px;                  /* "The Squish" */
 }
+
+/* --- Kiosk Specific Utilities --- */
+.bento-card-shadow { box-shadow: 0 20px 40px rgba(44, 47, 48, 0.06); }
+.cosmic-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%); position: relative; overflow: hidden; }
+.nature-gradient { background: linear-gradient(135deg, #fffbeb 0%, #ffedd5 50%, #fef3c7 100%); position: relative; overflow: hidden; }
+.star-field::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px); background-size: 80px 80px; opacity: 0.1; pointer-events: none; }
+.leaf-accent::after { content: "eco"; font-family: 'Material Symbols Outlined'; position: absolute; top: -20px; right: -20px; font-size: 120px; color: #16a34a; opacity: 0.05; pointer-events: none; }
