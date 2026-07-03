@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "version": ">= 13.2.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "586333342003-i7t3b613209bhfp4abnd8fti80t52r38.apps.googleusercontent.com"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://momentum-mobile-bff.onrender.com/mobile-bff",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "586333342003-i7t3b613209bhfp4abnd8fti80t52r38.apps.googleusercontent.com"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://momentum-mobile-bff.onrender.com/mobile-bff",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "586333342003-i7t3b613209bhfp4abnd8fti80t52r38.apps.googleusercontent.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

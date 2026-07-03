@@ -1,0 +1,30 @@
+# Ignore node_modules across all workspaces to let EAS reinstall them purely
+node_modules/
+**/node_modules/
+
+# Ignore compiled artifacts
+dist/
+**/dist/
+.expo/
+**/.expo/
+
+# Ignore other apps
+momentum-api/
+momentum-mobile-bff/
+momentum-web/
+momentum-mobile-temp/
+
+# Ignore generated native directories directly
+momentum-mobile/android/
+momentum-mobile/ios/
+
+# Ignore agent and AI artifacts to prevent tar/permission errors
+.agent/
+.artifacts/
+.gemini/
+archive/
+docs/
+Design Folder/
+*.tar
+*.tar.gz
+.git/

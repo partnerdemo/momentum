@@ -1,0 +1,26 @@
+{
+    "name": "momentum-shared",
+    "version": "1.0.0",
+    "description": "Shared logic and types for Momentum web and mobile applications",
+    "main": "index.ts",
+    "types": "index.ts",
+    "exports": {
+        ".": "./index.ts"
+    },
+    "sideEffects": false,
+    "scripts": {
+        "test": "jest",
+        "type-check": "tsc --noEmit"
+    },
+    "keywords": [
+        "momentum",
+        "shared",
+        "components"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "typescript": "~5.9.2"
+    }
+}

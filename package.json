@@ -1,0 +1,26 @@
+{
+  "name": "momentum",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Momentum Family Management Platform — Monorepo",
+  "workspaces": [
+    "momentum-shared",
+    "momentum-mobile"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=momentum-api",
+    "dev:bff": "npm run dev --workspace=momentum-mobile-bff",
+    "dev:web": "npm run dev --workspace=momentum-web",
+    "dev:mobile": "npm run start --workspace=momentum-mobile",
+    "dev:mobile-temp": "npm run start --workspace=momentum-mobile-temp",
+    "build:api": "npm run build --workspace=momentum-api",
+    "build:web": "npm run build --workspace=momentum-web",
+    "type-check:shared": "npm run type-check --workspace=momentum-shared",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

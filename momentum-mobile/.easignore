@@ -1,0 +1,13 @@
+android/
+ios/
+.expo/
+*.lock
+**/.agent/
+**/.artifacts/
+**/.gemini/
+**/archive/
+**/docs/
+**/*.tar
+**/*.tar.gz
+**/.git/
+node_modules/

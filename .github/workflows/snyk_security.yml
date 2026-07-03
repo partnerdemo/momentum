@@ -1,0 +1,36 @@
+name: Snyk Security Scan
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
+
+permissions:
+    contents: read
+    security-events: write
+
+
+jobs:
+    snyk_scan:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+            cache: 'npm'
+        - name: Install dependencies
+          run: npm ci
+        - name: install snyk cli
+          run: npm install -g snyk
+        - name: run snyk scan
+          continue-on-error: true
+          env:
+            SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          run: snyk test --all-projects --sarif-file-output=snyk.sarif
+        - name: upload snyk results to github 
+          if: always()
+          uses: github/codeql-action/upload-sarif@v3
+          with: 
+            sarif_file: snyk.sarif
