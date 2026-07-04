@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: momentum-mobile-bff
+    env: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_BASE_URL
+        sync: false
+      - key: PORT
+        value: 10000

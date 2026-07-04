@@ -1,0 +1,363 @@
+
+import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+
+// Color mapping: Our hex colors to Google Calendar color IDs
+// See: https://lukeboyle.com/blog/posts/google-calendar-api-color-id
+const COLOR_MAP: { [key: string]: string } = {
+    '#EF4444': '11', // Red -> Tomato
+    '#F97316': '6',  // Orange -> Tangerine
+    '#F59E0B': '5',  // Amber -> Banana
+    '#10B981': '10', // Emerald -> Basil
+    '#06B6D4': '7',  // Cyan -> Peacock
+    '#3B82F6': '9',  // Blue -> Blueberry
+    '#6366F1': '1',  // Indigo -> Lavender
+    '#8B5CF6': '3',  // Violet -> Grape
+    '#EC4899': '4',  // Pink -> Flamingo
+    '#6B7280': '8',  // Gray -> Graphite
+};
+
+function getClosestGoogleColor(hexColor: string): string {
+    // If exact match found, return it
+    if (COLOR_MAP[hexColor]) return COLOR_MAP[hexColor];
+
+    // Default to Blueberry (Blue) if no match
+    return '9';
+}
+
+export async function createNewCalendar(
+    accessToken: string,
+    details: { summary: string; description?: string; colorRgbFormat?: boolean },
+    refreshToken?: string
+): Promise<{ calendarId: string }> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const response = await calendar.calendars.insert({
+        requestBody: {
+            summary: details.summary,
+            description: details.description,
+            timeZone: 'America/Chicago', // We might want to make this dynamic later
+        },
+    });
+
+    return { calendarId: response.data.id! };
+}
+
+export async function createMemberCalendar(
+    name: string,
+    hexColor: string,
+    accessToken: string,
+    refreshToken?: string
+): Promise<string> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Create the calendar
+    const response = await calendar.calendars.insert({
+        requestBody: {
+            summary: name,
+            timeZone: 'America/Chicago', // Default for now
+        },
+    });
+
+    const calendarId = response.data.id!;
+
+    // Set calendar color
+    await updateGoogleCalendarColor(calendarId, hexColor, accessToken, refreshToken);
+
+    return calendarId;
+}
+
+export async function updateGoogleCalendarColor(
+    calendarId: string,
+    hexColor: string,
+    accessToken: string,
+    refreshToken?: string
+): Promise<void> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const googleColorId = getClosestGoogleColor(hexColor);
+
+    try {
+        await calendar.calendarList.update({
+            calendarId,
+            requestBody: {
+                colorId: googleColorId,
+            },
+        });
+    } catch (error) {
+        console.error('Error updating calendar color:', error);
+    }
+}
+
+export async function listUserCalendars(accessToken: string, refreshToken?: string): Promise<any[]> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const response = await calendar.calendarList.list({
+        minAccessRole: 'writer', // Only show calendars we can edit
+    });
+
+    return response.data.items || [];
+}
+
+export async function verifyCalendarAccess(accessToken: string, calendarId: string, refreshToken?: string): Promise<boolean> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    try {
+        await calendar.events.list({
+            calendarId,
+            maxResults: 1, // Just try to fetch one event to verify access
+        });
+        return true;
+    } catch (error) {
+        console.error('Verify calendar access failed:', error);
+        return false;
+    }
+}
+
+/**
+ * Create an event in Google Calendar
+ */
+export async function createGoogleCalendarEvent(
+    accessToken: string,
+    calendarId: string,
+    eventData: {
+        title: string;
+        description?: string;
+        location?: string;
+        startDate: Date;
+        endDate: Date;
+        allDay: boolean;
+        colorId?: string;
+        recurrence?: string[]; // RRULE format
+        reminderMinutes?: number;
+    },
+    refreshToken?: string
+): Promise<{ googleEventId: string }> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Build event object
+    const event: any = {
+        summary: eventData.title,
+        description: eventData.description,
+        location: eventData.location,
+        colorId: eventData.colorId,
+    };
+
+    // Set start and end times
+    if (eventData.allDay) {
+        // All-day events use date (not dateTime)
+        event.start = {
+            date: eventData.startDate.toISOString().split('T')[0],
+            timeZone: 'America/Chicago',
+        };
+        event.end = {
+            date: eventData.endDate.toISOString().split('T')[0],
+            timeZone: 'America/Chicago',
+        };
+    } else {
+        event.start = {
+            dateTime: eventData.startDate.toISOString(),
+            timeZone: 'America/Chicago',
+        };
+        event.end = {
+            dateTime: eventData.endDate.toISOString(),
+            timeZone: 'America/Chicago',
+        };
+    }
+
+    // Add recurrence if specified
+    if (eventData.recurrence && eventData.recurrence.length > 0) {
+        event.recurrence = eventData.recurrence;
+    }
+
+    // Add reminder if specified
+    if (eventData.reminderMinutes !== undefined) {
+        event.reminders = {
+            useDefault: false,
+            overrides: [
+                { method: 'popup', minutes: eventData.reminderMinutes },
+            ],
+        };
+    }
+
+    const response = await calendar.events.insert({
+        calendarId,
+        requestBody: event,
+    });
+
+    return {
+        googleEventId: response.data.id!,
+    };
+}
+
+/**
+ * Update an event in Google Calendar
+ */
+export async function updateGoogleCalendarEvent(
+    accessToken: string,
+    calendarId: string,
+    googleEventId: string,
+    eventData: {
+        title: string;
+        description?: string;
+        location?: string;
+        startDate: Date;
+        endDate: Date;
+        allDay: boolean;
+        colorId?: string;
+        recurrence?: string[]; // RRULE format
+        reminderMinutes?: number;
+    },
+    refreshToken?: string
+): Promise<void> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Build event object (similar to create)
+    const event: any = {
+        summary: eventData.title,
+        description: eventData.description,
+        location: eventData.location,
+        colorId: eventData.colorId,
+    };
+
+    // Set start and end times
+    if (eventData.allDay) {
+        event.start = {
+            date: eventData.startDate.toISOString().split('T')[0],
+            timeZone: 'America/Chicago',
+        };
+        event.end = {
+            date: eventData.endDate.toISOString().split('T')[0],
+            timeZone: 'America/Chicago',
+        };
+    } else {
+        event.start = {
+            dateTime: eventData.startDate.toISOString(),
+            timeZone: 'America/Chicago',
+        };
+        event.end = {
+            dateTime: eventData.endDate.toISOString(),
+            timeZone: 'America/Chicago',
+        };
+    }
+
+    // Add recurrence if specified
+    if (eventData.recurrence && eventData.recurrence.length > 0) {
+        event.recurrence = eventData.recurrence;
+    }
+
+    // Add reminder if specified
+    if (eventData.reminderMinutes !== undefined) {
+        event.reminders = {
+            useDefault: false,
+            overrides: [
+                { method: 'popup', minutes: eventData.reminderMinutes },
+            ],
+        };
+    }
+
+    try {
+        await calendar.events.patch({
+            calendarId,
+            eventId: googleEventId,
+            requestBody: event,
+        });
+    } catch (error) {
+        console.error('Error updating Google Calendar event:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete an event from Google Calendar
+ */
+export async function deleteGoogleCalendarEvent(
+    accessToken: string,
+    calendarId: string,
+    googleEventId: string,
+    refreshToken?: string
+): Promise<void> {
+    const oauth2Client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    try {
+        await calendar.events.delete({
+            calendarId,
+            eventId: googleEventId,
+        });
+    } catch (error) {
+        console.error('Error deleting Google Calendar event:', error);
+        throw error;
+    }
+}

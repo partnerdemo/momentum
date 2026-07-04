@@ -1,0 +1,85 @@
+/* app/global.css
+ *
+ * Tailwind v4 @theme block defines the brand CSS variables.
+ *
+ * ┌──────────────────────────────────────────────────────────────────┐
+ * │ DESIGN-TOKEN SOURCE OF TRUTH: momentum-shared/tokens/             │
+ * │                                                                   │
+ * │ The values below MUST stay in sync with that package. If you      │
+ * │ change a color here, change it in momentum-shared/tokens/colors.ts│
+ * │ in the same commit (and vice versa). When the planned             │
+ * │ build-time CSS-var generator lands, this block will be            │
+ * │ auto-generated; until then it is hand-maintained.                 │
+ * │                                                                   │
+ * │ Verified aligned 2026-06-15. Previously this file used divergent  │
+ * │ values for `signal-success` (#16A34A vs shared #10B981) and       │
+ * │ `signal-error` (#DC2626 vs shared #EF4444) — both now corrected   │
+ * │ to the canonical shared values.                                   │
+ * └──────────────────────────────────────────────────────────────────┘
+ */
+
+/* --- 1. Import Inter Font --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* --- 2. Import Tailwind v4 --- */
+@import "tailwindcss";
+
+/* --- 3. Define Base Styles --- */
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+}
+
+/* --- 4. Brand tokens (DERIVED FROM momentum-shared/tokens/) --- */
+@theme {
+  /* Text — derived from momentum-shared colors.{textPrimary,textSecondary,textTertiary} */
+  --color-text-primary: #1C1917;
+  --color-text-secondary: #57534E;
+  --color-text-tertiary: #A8A29E;
+
+  /* Brand — derived from momentum-shared colors.{brandPrimary,brandLight,brandDark} */
+  --color-action-primary: #6366F1;
+  --color-action-light: #818CF8;
+  --color-action-hover: #4F46E5;
+
+  /* Signals — derived from momentum-shared colors.{success,alert,error} (+ Light variants) */
+  --color-signal-success: #10B981;
+  --color-signal-success-light: #ECFDF5;
+  --color-signal-alert: #F59E0B;
+  --color-signal-alert-light: #FFFBEB;
+  --color-signal-error: #EF4444;
+  --color-signal-error-light: #FEF2F2;
+
+  /* Surfaces — derived from momentum-shared colors.{canvas,surface,borderSubtle} */
+  --color-bg-canvas: #FFF9F5;
+  --color-bg-surface: #FFFFFF;
+  --color-border-subtle: #E5E7EB;
+
+  /* Radius — derived from momentum-shared borderRadius.{sm,md,lg,xl,xxl,pill} */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;     /* "The Squish" — signature bento card edge */
+  --radius-xxl: 32px;
+  --radius-pill: 9999px;
+
+  /* Spacing — derived from momentum-shared spacing.{xs..giant} */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-xxl: 24px;
+  --space-xxxl: 32px;
+  --space-huge: 40px;
+  --space-massive: 48px;
+  --space-giant: 64px;
+}
+
+/* --- 5. Kiosk-specific utilities (not in shared — web-only) --- */
+.bento-card-shadow { box-shadow: 0 20px 40px rgba(44, 47, 48, 0.06); }
+.cosmic-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%); position: relative; overflow: hidden; }
+.nature-gradient { background: linear-gradient(135deg, #fffbeb 0%, #ffedd5 50%, #fef3c7 100%); position: relative; overflow: hidden; }
+.star-field::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px); background-size: 80px 80px; opacity: 0.1; pointer-events: none; }
+.leaf-accent::after { content: "eco"; font-family: 'Material Symbols Outlined'; position: absolute; top: -20px; right: -20px; font-size: 120px; color: var(--color-signal-success); opacity: 0.05; pointer-events: none; }

@@ -1,0 +1,301 @@
+import * as dotenv from 'dotenv';
+// 1. Load Environment Variables FIRST, before any other module imports to ensure all env vars are fully populated
+dotenv.config();
+
+// 1a. Initialize Sentry IMMEDIATELY after env vars load. Sentry instruments via
+//     OpenTelemetry and needs to register before Express/Mongoose are imported.
+//     No-op if SENTRY_DSN is unset.
+import { initSentry, Sentry } from './config/sentry';
+initSentry();
+
+import express from 'express';
+import mongoose from 'mongoose';
+import { ServerApiVersion } from 'mongodb';
+import cors from 'cors';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
+import compression from 'compression';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from './config/constants';
+
+// Import routers
+import authRouter from './routes/authRoutes';
+import householdRouter from './routes/householdRoutes';
+import taskRouter from './routes/taskRoutes';
+import storeItemRouter from './routes/storeItemRoutes';
+import questRouter from './routes/questRoutes';
+import routineRouter from './routes/routineRoutes';
+import mealRouter from './routes/mealRoutes';
+import wishlistRouter from './routes/wishlistRoutes';
+import pinRouter from './routes/pin';
+import householdLinkRouter from './routes/householdLinkRoutes';
+import notificationRouter from './routes/notificationRoutes';
+import googleCalendarRouter from './routes/googleCalendarRoutes';
+import calendarManagementRouter from './routes/calendarManagementRoutes';
+import dashboardRouter from './routes/dashboardRoutes';
+import familyRouter from './routes/familyRoutes';
+import eventRouter from './routes/eventRoutes';
+
+// Import error handling
+import AppError from './utils/AppError';
+import { globalErrorHandler } from './utils/errorHandler';
+// Environment validation is handled below
+
+// 2. Validate Required Environment Variables
+const requiredEnvVars = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_REDIRECT_URI'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ CRITICAL ERROR: Missing required environment variables:');
+  missingEnvVars.forEach(varName => {
+    console.error(`   - ${varName}`);
+  });
+  console.error('\nPlease set these variables in your .env file before starting the server.');
+  process.exit(1);
+}
+
+// Warn about optional but recommended variables
+const recommendedEnvVars = ['NODE_ENV', 'JWT_EXPIRES_IN', 'PORT'];
+const missingRecommended = recommendedEnvVars.filter(varName => !process.env[varName]);
+
+if (missingRecommended.length > 0) {
+  console.warn('⚠️  WARNING: Missing recommended environment variables (using defaults):');
+  missingRecommended.forEach(varName => {
+    console.warn(`   - ${varName}`);
+  });
+}
+
+// Extract validated environment variables
+const MONGO_URI = process.env.MONGO_URI!; // Safe to use ! because we validated above
+const PORT = (process.env.PORT && process.env.PORT !== '3000') ? process.env.PORT : 3001;
+
+// 3. Database Connection Setup
+const connectDB = async () => {
+  try {
+    // MANDATORY: Stable API Configuration (Phase 1.2)
+    await mongoose.connect(MONGO_URI, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
+    });
+
+    console.log('✅ MongoDB connection successful with Stable API.');
+  } catch (error) {
+    console.error('❌ MongoDB connection failed:', error);
+    // Exit process on failure
+    process.exit(1);
+  }
+};
+
+// 4. Express App Setup (Must be camelCase: app)
+const app = express();
+// Enable trust proxy for Render/Cloudflare
+app.set('trust proxy', 1);
+const httpServer = createServer(app);
+
+// CORS Configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002', // Mobile BFF
+    'http://localhost:8081',
+    'https://momentum-web.onrender.com',
+    'https://momentum-mobile-bff.onrender.com'
+  ];
+
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`Blocked CORS request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
+export const io = new Server(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+// Socket.IO Authentication Middleware — validates JWT before allowing connection
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) {
+    return next(new Error('Authentication required'));
+  }
+
+  // Strip 'Bearer ' prefix if present (web client sends it, mobile does not)
+  const rawToken = token.startsWith('Bearer ') ? token.slice(7) : token;
+
+  try {
+    const decoded = jwt.verify(rawToken, JWT_SECRET) as { id: string; householdId: string };
+    (socket as any).decoded = decoded;
+    next();
+  } catch (err) {
+    return next(new Error('Invalid or expired token'));
+  }
+});
+
+io.on('connection', (socket: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('A user connected:', socket.id, '| userId:', socket.decoded?.id);
+  }
+
+  // Handler for both event name variants (snake_case from web, camelCase from mobile)
+  const handleJoinHousehold = (requestedHouseholdId: string) => {
+    if (!requestedHouseholdId) return;
+
+    // Security: only allow joining the household assigned in the user's JWT
+    const authorizedHouseholdId = socket.decoded?.householdId;
+    if (requestedHouseholdId !== authorizedHouseholdId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(
+          `Socket ${socket.id} tried to join household ${requestedHouseholdId} but is authorized for ${authorizedHouseholdId}`
+        );
+      }
+      socket.emit('error', { message: 'Not authorized for this household' });
+      return;
+    }
+
+    socket.join(requestedHouseholdId);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Socket ${socket.id} joined household room: ${requestedHouseholdId}`);
+    }
+  };
+
+  socket.on('join_household', handleJoinHousehold);
+  socket.on('joinHousehold', handleJoinHousehold);
+
+  socket.on('disconnect', () => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('User disconnected:', socket.id);
+    }
+  });
+});
+
+// Make io accessible in controllers via req.app.get('io')
+app.set('io', io);
+
+// Middleware
+app.use(compression()); // Compress all HTTP responses for performance
+
+// Security Middleware
+app.use(helmet()); // Set security HTTP headers
+
+// Limit requests from same API
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3000, // Limit each IP to 3000 requests per windowMs (approx 3/sec avg)
+  message: 'Too many requests from this IP, please try again in 15 minutes',
+  // Exempt auth routes — the BFF proxy shares a single IP for all mobile users,
+  // so auth endpoints (especially Google sign-in) must never be rate-limited here
+  skip: (req) => req.path.startsWith('/v1/auth/') || req.path.startsWith('/api/v1/auth/'),
+});
+app.use('/api', limiter); // Apply to all API routes
+
+// Data Sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+app.use(cors(corsOptions)); // Allow cross-origin requests
+app.use(express.json({ limit: '10kb' })); // Parse JSON bodies (limit body size)
+
+
+// 5. API Routes
+// Register Auth routes first
+app.use('/api/v1/auth', authRouter);
+
+// Register PIN routes
+app.use('/api/v1/pin', pinRouter);
+
+// Register Household routes
+app.use('/api/v1/households', householdRouter);
+
+// Register Household Link routes (child sharing)
+app.use('/api/v1/household', householdLinkRouter);
+
+// Register Task routes
+app.use('/api/v1/tasks', taskRouter);
+// Register Store Item routes
+app.use('/api/v1/store-items', storeItemRouter);
+// Register Quest routes
+app.use('/api/v1/quests', questRouter);
+// Register Routine routes
+app.use('/api/v1/routines', routineRouter);
+// Register Meal routes
+app.use('/api/v1/meals', mealRouter);
+// Register Wishlist routes
+app.use('/api/v1/wishlist', wishlistRouter);
+// Register Notification routes
+app.use('/api/v1/notifications', notificationRouter);
+// Register Google Calendar routes
+app.use('/api/v1/calendar/google', googleCalendarRouter);
+// Register Calendar Management routes (list, create, verify)
+app.use('/api/v1/calendar', calendarManagementRouter);
+// Register Dashboard routes
+app.use('/api/v1/dashboard', dashboardRouter);
+// Register Family routes
+app.use('/api/v1/family', familyRouter);
+// Register Event routes
+app.use('/api/v1/events', eventRouter);
+
+
+// Basic Health Check Route
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'API is running', environment: process.env.NODE_ENV });
+});
+
+// 6. UNHANDLED ROUTE HANDLER
+// Catch all for routes not defined by the application
+app.all('*', (req, res, next) => {
+  // Use the AppError utility to create an operational error
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+});
+
+// 7. SENTRY ERROR HANDLER — must come BEFORE the global error handler so
+//    that errors are captured to Sentry before any custom response shaping.
+//    No-op if Sentry was never initialized (SENTRY_DSN unset).
+Sentry.setupExpressErrorHandler(app);
+
+// 8. GLOBAL ERROR HANDLER
+// This middleware runs whenever next(err) is called with an error object
+app.use(globalErrorHandler);
+
+// 9. Start Server
+const startServer = async () => {
+  await connectDB();
+
+  // Use httpServer.listen instead of app.listen
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+};
+
+if (require.main === module) {
+  startServer();
+}
+
+export { app, httpServer };

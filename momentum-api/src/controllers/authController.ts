@@ -1,0 +1,199 @@
+// src/controllers/authController.ts
+import { Request, Response, NextFunction } from 'express';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import { Types } from 'mongoose';
+import asyncHandler from 'express-async-handler';
+import FamilyMember from '../models/FamilyMember';
+import Household, { IHouseholdMemberProfile } from '../models/Household';
+import { JWT_SECRET, JWT_EXPIRES_IN } from '../config/constants';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import AppError from '../utils/AppError';
+
+import { signToken } from '../utils/jwt';
+
+
+export const signup = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const { firstName, lastName, email, password } = req.body;
+  // These are now optional
+  let { householdName, userDisplayName, userProfileColor, inviteCode } = req.body;
+
+  if (!firstName || !lastName || !email || !password) {
+    return next(new AppError('Missing mandatory fields (firstName, lastName, email, password).', 400));
+  }
+
+  // Set defaults for optional fields
+  if (!userDisplayName) userDisplayName = firstName;
+  if (!userProfileColor) userProfileColor = '#6366f1'; // Default Indigo
+
+  try {
+    const newParent = await FamilyMember.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      onboardingCompleted: false, // Explicitly set to false
+    });
+
+    const parentId: Types.ObjectId = newParent._id as Types.ObjectId;
+    let householdId: Types.ObjectId;
+    let household;
+
+    if (inviteCode) {
+      // Joining existing household via code
+      household = await Household.findOne({ inviteCode: inviteCode.toUpperCase() });
+
+      if (!household) {
+        await FamilyMember.findByIdAndDelete(parentId);
+        return next(new AppError('Invalid invite code.', 404));
+      }
+
+      const isMember = household.memberProfiles.some(
+        (p) => p.familyMemberId.toString() === parentId.toString()
+      );
+
+      if (isMember) {
+        await FamilyMember.findByIdAndDelete(parentId);
+        return next(new AppError('User is already a member of this household.', 400));
+      }
+
+      const newProfile: IHouseholdMemberProfile = {
+        familyMemberId: parentId,
+        displayName: userDisplayName,
+        profileColor: userProfileColor,
+        role: 'Parent',
+        pointsTotal: 0,
+      };
+
+      household.memberProfiles.push(newProfile);
+      await household.save();
+      householdId = household._id as Types.ObjectId;
+
+    } else if (householdName) {
+      // Creating a specific new household (e.g. from full form if we kept it)
+      const creatorProfile: IHouseholdMemberProfile = {
+        familyMemberId: parentId,
+        displayName: userDisplayName,
+        profileColor: userProfileColor,
+        role: 'Parent',
+        pointsTotal: 0,
+      };
+
+      household = await Household.create({
+        householdName,
+        memberProfiles: [creatorProfile],
+      });
+      householdId = household._id as Types.ObjectId;
+    } else {
+      // Placeholder Household Logic (Minimal Signup)
+      const creatorProfile: IHouseholdMemberProfile = {
+        familyMemberId: parentId,
+        displayName: userDisplayName,
+        profileColor: userProfileColor,
+        role: 'Parent',
+        pointsTotal: 0,
+      };
+
+      household = await Household.create({
+        householdName: `${firstName}'s Household`, // Placeholder name
+        memberProfiles: [creatorProfile],
+      });
+      householdId = household._id as Types.ObjectId;
+    }
+
+    const token = signToken(parentId.toString(), householdId.toString());
+
+    const userWithRole = {
+      ...newParent.toObject(),
+      role: 'Parent',
+    };
+
+    res.status(201).json({
+      status: 'success',
+      token,
+      data: {
+        parent: userWithRole,
+        household,
+        needsOnboarding: true, // Signal to frontend to redirect
+      },
+    });
+
+  } catch (err: any) {
+    if (err.code === 11000) {
+      return next(new AppError('This email address is already registered.', 409));
+    }
+    return next(new AppError(`Failed to create user or household: ${err.message}`, 500));
+  }
+});
+
+export const login = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return next(new AppError('Please provide email and password.', 400));
+  }
+
+  const familyMember = await FamilyMember.findOne({ email }).select('+password');
+  const isPasswordCorrect = familyMember && (await familyMember.comparePassword(password));
+
+  if (!isPasswordCorrect) {
+    return next(new AppError('Incorrect email or password.', 401));
+  }
+
+  const parentId: Types.ObjectId = familyMember._id as Types.ObjectId;
+
+  const household = await Household.findOne({
+    'memberProfiles.familyMemberId': parentId,
+    'memberProfiles.role': 'Parent',
+  });
+
+  if (!household) {
+    return next(new AppError('User does not belong to any household as a Parent.', 401));
+  }
+
+  const primaryHouseholdId: Types.ObjectId = household._id as Types.ObjectId;
+  const token = signToken(parentId.toString(), primaryHouseholdId.toString());
+
+  const userWithRole = {
+    ...familyMember.toObject(),
+    role: 'Parent',
+  };
+
+  res.status(200).json({
+    status: 'success',
+    token,
+    data: {
+      parent: userWithRole,
+      primaryHouseholdId,
+    },
+  });
+});
+
+
+
+export const getMe = asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (!req.user || !req.householdId) {
+    return next(new AppError('Not authenticated.', 401));
+  }
+
+  const household = await Household.findById(req.householdId);
+  if (!household) {
+    return next(new AppError('Household not found.', 404));
+  }
+
+  const memberProfile = household.memberProfiles.find(
+    (member) => member.familyMemberId && member.familyMemberId.toString() === (req.user!._id as Types.ObjectId).toString()
+  );
+
+  const userWithRole = {
+    ...req.user.toObject(),
+    role: memberProfile?.role || 'Child',
+  };
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user: userWithRole,
+      householdId: req.householdId,
+    },
+  });
+});
