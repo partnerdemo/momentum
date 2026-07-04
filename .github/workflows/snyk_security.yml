@@ -20,8 +20,10 @@ jobs:
           with:
             node-version: '20'
             cache: 'npm'
-        - name: Install dependencies
+        - name: Install root dependencies
           run: npm install
+        - name: Install subproject dependencies
+          run: cd momentum-api && npm install && cd .. && cd momentum-mobile-bff && npm install && cd .. && cd momentum-web && npm install && cd ..
         - name: install snyk cli
           run: npm install -g snyk
         - name: Run Snyk scan
