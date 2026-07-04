@@ -5,7 +5,10 @@
   "description": "Momentum Family Management Platform — Monorepo",
   "workspaces": [
     "momentum-shared",
-    "momentum-mobile"
+    "momentum-api",
+    "momentum-mobile",
+    "momentum-mobile-bff",
+    "momentum-web"
   ],
   "scripts": {
     "dev:api": "npm run dev --workspace=momentum-api",
