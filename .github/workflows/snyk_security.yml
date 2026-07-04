@@ -24,13 +24,13 @@ jobs:
           run: npm install
         - name: install snyk cli
           run: npm install -g snyk
-        - name: run snyk scan
+        - name: Run Snyk scan
           continue-on-error: true
           env:
             SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          run: snyk test --all-projects --sarif-file-output=snyk.sarif
-        - name: upload snyk results to github 
-          if: always()
-          uses: github/codeql-action/upload-sarif@v3
-          with: 
-            sarif_file: snyk.sarif
+          run: snyk test --all-projects --json > snyk-results.json 2>&1
+        - name: Run Snyk SARIF scan
+          continue-on-error: true
+          env:
+            SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          run: snyk test --sarif-file-output=snyk.sarif
