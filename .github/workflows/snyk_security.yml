@@ -23,7 +23,12 @@ jobs:
         - name: Install root dependencies
           run: npm install
         - name: Install subproject dependencies
-          run: cd momentum-api && npm install && cd .. && cd momentum-mobile-bff && npm install && cd .. && cd momentum-web && npm install && cd ..
+          run: |
+            cd momentum-api && npm install && cd ..
+            cd momentum-mobile && npm install && cd ..
+            cd momentum-mobile-bff && npm install && cd ..
+            cd momentum-shared && npm install && cd ..
+            cd momentum-web && npm install && cd ..
         - name: install snyk cli
           run: npm install -g snyk
         - name: Run Snyk scan
