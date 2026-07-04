@@ -33,4 +33,9 @@ jobs:
           continue-on-error: true
           env:
             SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          run: snyk test --sarif-file-output=snyk.sarif
+          run: snyk test --all-projects --sarif-file-output=snyk.sarif
+        - name: Upload Snyk results to GitHub
+          if: always()
+          uses: github/codeql-action/upload-sarif@v3
+          with:
+            sarif_file: snyk.sarif
